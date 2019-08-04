@@ -1,0 +1,323 @@
+## Setup
+
+### Load packages
+
+```{r load-packages, message = FALSE}
+library('ggplot2')      # library to create plots
+library('dplyr')        # data manipulation
+library('tidyr')
+library('statsr')       # staistics functions
+library('BAS')          # Bayesian statistics functions
+library('GGally')       # library to create plots
+library('knitr')        # required to apply knitr options 
+library('grid')         # arrange plots 
+library('gridExtra')    # arrange plots
+library('MASS')         # AIC functions
+
+knitr::opts_chunk$set(comment=NA, fig.align='center')
+```
+
+### Load data
+
+Make sure your data and R Markdown files are in the same directory. When loaded
+your data file will be called `movies`. Delete this note when before you submit 
+your work. 
+
+```{r load-data}
+load("movies.Rdata")
+df<-movies
+```
+
+
+
+* * *
+
+## Part 1: Data
+The present data were derived from an observational study. The data set is comprised of 651 randomly sampled movies produced and released from 1970 to 2014. According to IMDb, there have 9,962 movies been release from 1972 to 2016 so that the 10% condition (9,962*10% = 996) is met. Since the sampling size is large enough and less than 10% of population, it can assume that the random sampling is conducted. Therefore we can conclude that the sample is indeed generalizable to the entire population.
+
+The data cannot be used to establish a causal relation between the variables of interest as there was no random assignment to the explanatory and independent variables.
+
+* * *
+
+## Part 2: Data manipulation
+
+Adding New columns as required using 2 ways.
+
+```{r}
+str(df)
+colnames(df)
+
+df$oscar_season<-as.factor(sapply(df$thtr_rel_month,function(x) {ifelse(x %in% c(12,10,11),'yes','no')}))
+head(df$oscar_season)
+df$summer_season<-as.factor(sapply(df$thtr_rel_month,function(x) {ifelse(x %in% c(5,6,7,8),'yes','no')}))
+#trying through mutate function.
+df <- df %>% mutate(mpaa_rating_R = as.factor(ifelse(mpaa_rating == 'R', 'yes', 'no')))
+df<-df%>% mutate(drama=as.factor(ifelse(genre=='Drama','yes','no')))
+df <- df %>% mutate(feature_film = as.factor(ifelse(title_type ==  'Feature Film', 'yes', 'no')))
+```
+
+```{r}
+str(df)
+colnames(df)
+```
+
+
+
+* * *
+
+## Part 3: Exploratory data analysis
+Here, we would like to check the relationship between the newly created variables with the dependent or response variable
+
+```{r}
+subset<-c('audience_score', 'oscar_season', 'summer_season', 'mpaa_rating_R', 'drama', 'feature_film')
+
+df2<-df[,subset]
+
+
+```
+Removing the NA values .
+
+```{r}
+df2<-na.omit(df2)
+any(is.na(df2))
+```
+```{r}
+dmode <- function(x) {
+  den <- density(x, kernel = c("gaussian"))
+  ( den$x[den$y == max(den$y)] )   
+}  
+mode=dmode(df2$audience_score)
+mode
+
+```
+
+
+```{r}
+ggplot(df2,aes(x=audience_score,y=..density..))+ geom_histogram(bins=50,fill='blue',color='darkblue',alpha=0.5)+geom_density(size=1,color='brown')+geom_vline(xintercept = mean(df2$audience_score),color='red',size=2)+geom_vline(xintercept = median(df2$audience_score),color='green',size=2)+geom_vline(xintercept = mode,color='steelblue',size=2) +geom_text(aes( x = (mean(df2$audience_score) - 5), y = .020, label = 'mean',
+            color = 'steelblue'), size = 4, parse = T) +
+  geom_text(aes( x = (median(df2$audience_score) + 5),y = .020,  label = 'median',
+            color = 'green'), size = 4, parse = T) +
+  geom_text(aes( x = (mode + 5), y = .020, label = 'mode', colour = 'red'),
+            size = 4, parse = T)
+```
+
+```{r}
+summary(df2$audience_score)
+```
+
+```{r}
+pl1 <- ggplot(df2, aes(x = summer_season, y = audience_score, fill = summer_season)) + 
+      geom_boxplot() + ggtitle('Audience score vs summer season') + xlab('summer season') + 
+      ylab('Audience Score') + scale_fill_brewer(name = "summer season")
+
+pl2 <- ggplot(df2, aes(x = oscar_season, y = audience_score, fill = oscar_season)) + 
+      geom_boxplot() + ggtitle('Audience score vs oscar_season') + xlab('oscar_season') + 
+      ylab('Audience Score') + scale_fill_brewer(name = "oscar_season")
+
+pl3 <- ggplot(df2, aes(x = drama, y = audience_score, fill = drama)) + geom_boxplot() +
+      ggtitle('Audience score vs drama') + xlab('drama') + ylab('Audience Score') + 
+      scale_fill_brewer(name = "drama")
+
+pl4 <- ggplot(df2, aes(x = feature_film, y = audience_score, fill = feature_film)) + 
+      geom_boxplot() + ggtitle('Audience score vs feature_film') + xlab('feature_film') + 
+      ylab('Audience Score') + scale_fill_brewer(name = "feature_film")
+
+pl5 <- ggplot(df2, aes(x = mpaa_rating_R, y = audience_score, fill = mpaa_rating_R)) + 
+      geom_boxplot() + ggtitle('Audience score vs mpaa_rating_R') + xlab('mpaa_rating_R') + 
+      ylab('Audience Score') + scale_fill_brewer(name = "mpaa_rating_R")
+
+grid.arrange(pl1,pl2,pl3,pl4,pl5,ncol=2)
+```
+
+```{r}
+data.grouped <- gather(df2, 'features', 'flag', 2:6)
+ggplot(data = data.grouped, aes(x = features, y = audience_score, fill = flag)) + geom_boxplot() +
+      ggtitle('Audience score vs grouped featues') + xlab('grouped featues') + ylab('Audience Score') +
+      theme(axis.text.x = element_text(angle = 60, hjust = 1)) + 
+      scale_fill_brewer(name = "grouped featues")
+```
+
+The new features do not show much variability in the different features, which leads to the conclusion that none of the above features are valuable towards the prediction of the audience score. The only feature which might be relevant, could be the 'feature_film' feature. There seems to be a clear differentiation. But we shouldn't jump into conclusions right away, therefore we will continue analysing the data.
+
+Let's take a look at the relation between the response variable and the old features
+
+```{r}
+subset2<-c( 'audience_score', 'feature_film', 'drama', 'runtime', 'mpaa_rating_R', 'thtr_rel_year', 
+               'oscar_season', 'summer_season', 'imdb_rating', 'imdb_num_votes', 'critics_score', 
+               'best_pic_nom', 'best_pic_win', 'best_actor_win', 'best_actress_win', 'best_dir_win', 
+               'top200_box')
+
+
+```
+
+
+```{r}
+df0 <- df[, subset2]
+    
+    # remove NA's
+    df0<- na.omit(df0)
+
+    p1 <- ggplot(df0, aes(audience_score, fill = feature_film))
+    p1 <- p1 + geom_density(size=1, colour="darkgreen") + labs(title = "Dist. of audience score vs. feature_film") + 
+               labs(x = "feature film", y = "Density")
+    
+    p2 <- ggplot(df0, aes(audience_score, fill = drama))
+    p2 <- p2 + geom_density (alpha = 0.2) + labs(title = "Dist. of audience score vs. drama") + 
+               labs(x = "drama", y = "Density")
+    
+    p3 <- ggplot(df0, aes(audience_score, fill = top200_box))
+    p3 <- p3 + geom_density (alpha = 0.2) + labs(title = "Dist. of audience score vs. top200_box") +
+               labs(x = "top200 box", y = "Density")
+    
+    p4 <- ggplot(df0, aes(audience_score, fill = oscar_season))
+    p4 <- p4 + geom_density(size=1, colour="darkgreen") + labs(title = "Dist. of audience score vs. oscar_season") + 
+               labs(x = "oscar season", y = "Density")
+
+    p5 <- ggplot(df0, aes(audience_score, fill = summer_season))
+    p5 <- p5 + geom_density (alpha = 0.2) + labs(title = "Dist. of audience score vs. summer_season") + 
+               labs(x = "summer season", y = "Density")
+    
+    p6 <- ggplot(df0, aes(audience_score, fill = best_pic_nom))
+    p6  <- p6 + geom_density (alpha = 0.2) + labs(title = "Dist. of audience score vs. best_pic_nom") + 
+                labs(x = "best pic nom", y = "Density")
+    
+    p7 <- ggplot(df0, aes(audience_score, fill = best_pic_win))
+    p7 <- p7 + geom_density(size=1, colour="darkgreen") + labs(title = "Dist. of audience score vs. best pic win") + 
+               labs(x = "best pic win", y = "Density")
+    
+    p8 <- ggplot(df0, aes(audience_score, fill = best_actor_win))
+    p8 <- p8 + geom_density (alpha = 0.2) + labs(title = "Dist. of audience score vs. best_actor_win") + 
+               labs(x = "best actor win", y = "Density")
+    
+    p9 <- ggplot(df0, aes(audience_score, fill = best_dir_win))
+    p9 <- p9 + geom_density (alpha = 0.2) + labs(title = "Dist. of audience score vs. best_dir_win") + 
+               labs(x = "best dir win", y = "Density")
+    
+    p10 <- ggplot(df0, aes(audience_score, fill = best_actress_win))
+    p10 <- p10 + geom_density (alpha = 0.2) + labs(title = "Dist. of audience score vs. best_actress_win") + 
+                 labs(x = "best actress win", y = "Density")
+    
+    grid.arrange(p1, p2, p3, p4, p5, p6, p7, p8, p9, p10, ncol = 2)
+```
+
+* * *
+
+## Part 4: Modeling
+```{r}
+subset3 <- c( 'audience_score', 'feature_film', 'drama', 'runtime', 'mpaa_rating_R', 'thtr_rel_year', 
+               'oscar_season', 'summer_season', 'imdb_rating', 'imdb_num_votes', 'critics_score', 
+               'best_pic_nom', 'best_pic_win', 'best_actor_win', 'best_actress_win', 'best_dir_win', 
+               'top200_box')
+df3<-df[,subset3]
+
+df3<-na.omit(df3)
+str(df3)
+```
+We will be using the BIC and the Zellner-Siow Cauchy prior for the analysis.
+
+```{r}
+
+bic_model<-bas.lm(formula=audience_score~.,data=df3,prior = 'BIC',modelprior = uniform())
+summary(bic_model)
+
+```
+
+```{r}
+a<-coefficients(bic_model)
+b<-confint(a)
+d=cbind(a$postmean,a$postsd,b)
+colnames(d)<-c('postmean','poststd','2.5%','97.5%','beta')
+d
+```
+The summary of the given model indicates the top 5 models. The model containing the intercept, runtime, mdb_rating and critics_score, show the best performance, but as one can see, the top 2 models contain only about 27 percent of the posterior mass over all models.
+
+```{r}
+image(bic_model,rotate=F)
+```
+
+Lets use the Zellner-Siow Cauchy prior .
+
+```{r}
+zs_model <-  bas.lm(formula = audience_score~., data = df3,prior="ZS-null",modelprior=uniform(),method = "MCMC", MCMC.iterations = 10^6) 
+
+image(zs_model,rotate=F)
+
+```
+Based on the two priors used here, we see that the only features which lead us to the top models are  runtime, imdb_rating and critics_score.
+
+Hence, we would stick to these features only and find the best model to be used.
+
+```{r}
+subset4<-c('audience_score', 'runtime', 'imdb_rating', 'critics_score')
+df4<-df[,subset4]
+
+df4<-na.omit(df4)
+
+```
+
+```{r}
+model_g   = bas.lm(audience_score~., data = df4, prior = "g-prior",  modelprior = uniform()) 
+model_zs  = bas.lm(audience_score~., data = df4, prior = "ZS-null", modelprior = uniform())
+model_bic = bas.lm(audience_score~., data = df4, prior = "BIC",    modelprior = uniform())
+
+prob<-cbind(model_g$probne0,model_zs$probne0,model_bic$probne0)
+colnames(prob)<-c('g-prior','zs-null prior','bic prior')
+rownames(prob)<-c('intercept','runtime','imdb_rating','critics_score')
+head(prob)
+for (i in 1:3){
+  barplot(height = prob[,i],main = colnames(prob)[i],ylim=c(0,1),col='green')
+}
+```
+
+Since, For all priors , the pip for runtime is less than 0.5, we decide to exclude it from our model which leaves us with the final predictors as the imdb_rating and the criticss score.
+
+```{r}
+subset5<-c('audience_score', 'imdb_rating', 'critics_score')
+df5<-df[,subset5]
+df5<-na.omit(df5)
+final_model<-bas.lm(formula=audience_score~.,data=df5,prior = 'ZS-null',modelprior =uniform(),method='MCMC',MCMC.iterations = 10^6)
+
+```
+
+```{r}
+BMA=predict(final_model,estimator="BMA")
+HPM=predict(final_model,estimator = "HPM")
+
+```
+
+```{r}
+coef(final_model)
+```
+
+* * *
+
+## Part 5: Prediction
+
+```{r}
+library(caTools)
+set.seed(123)
+
+split<-sample.split(df5$audience_score,SplitRatio = 0.7)
+train<-subset(df5,split==T)
+test<-subset(df5,split==F)
+```
+
+```{r}
+head(test)
+final_model2<-bas.lm(formula=audience_score~.,data=train,prior = 'ZS-null',modelprior =uniform(),method='MCMC',MCMC.iterations = 10^6)
+predicted<-predict(final_model2,newdata = test,estimator = 'HPM')
+
+head(predicted$fit)
+head(predicted$Ybma)
+```
+
+
+
+* * *
+
+## Part 6: Conclusion
+
+In this project, we tried to eexclude all the variables which were of least or no use in predicting the audience score. We started of with a lot of variables but it turns out that most of our EDA and our priors for various models suggest that the only variables of value to us for predicting the audience score are the critics score aand imdb rating.
+
+Using these 2 variables, we have tried to predict some part of our data by training a model using the rest of the data.
+
